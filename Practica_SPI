@@ -5,117 +5,67 @@
 #include "derivative.h" /* include peripheral declarations */
 
 #define SPI_PUSHR_PCS0_ON 0x10000
-#define SPI_PUSHR_PCS1_ON 0x20000
-#define SPI_PUSHR_PCS2_ON 0x40000
-#define SPI_PUSHR_PCS3_ON 0x80000
-#define SPI_PUSHR_PCS4_ON 0x100000
-#define SPI_PUSHR_PCS5_ON 0x200000
-#define SPI_CTAR_FMSZ_8BIT 0x38000000
-#define SPI_CTAR_FMSZ_16BIT 0x78000000k
+
 
 void sendData(void){
-	unsigned char cmd = 0x01;
-	SPI0_MCR |=  SPI_MCR_HALT_MASK;
-	SPI0_MCR |= (SPI_MCR_CLR_RXF_MASK | SPI_MCR_CLR_TXF_MASK); //flush the fifos
-	SPI0_SR |= (SPI_SR_TCF_MASK | SPI_SR_EOQF_MASK | SPI_SR_TFUF_MASK | SPI_SR_TFFF_MASK | SPI_SR_RFOF_MASK | SPI_SR_RFDF_MASK); //clear the status bits (write-1-to-clear)
-	SPI0_TCR |= SPI_TCR_SPI_TCNT_MASK;
-	SPI0_MCR &=  ~SPI_MCR_HALT_MASK;
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK | SPI_PUSHR_PCS0_ON | cmd);
+	SPI0_MCR &= ~SPI_MCR_HALT_MASK;//Stop tranfer
+	SPI0_SR |= (1<<31);
+
+	//SPI0_PUSHR= (SPI_PUSHR_TXDATA(0xAA) | SPI_PUSHR_CONT_MASK |  SPI_PUSHR_PCS(0));
+	SPI0_PUSHR = 0xAA; 
 	while(!(SPI0_SR & SPI_SR_TCF_MASK));
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK | SPI_PUSHR_PCS0_ON | 0xAA);
-	while(!(SPI0_SR & SPI_SR_TCF_MASK));
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK | SPI_PUSHR_PCS0_ON | 0xBB);
-	while(!(SPI0_SR & SPI_SR_TCF_MASK));
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK | SPI_PUSHR_PCS0_ON | 0xCC);
-	while(!(SPI0_SR & SPI_SR_TCF_MASK));
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK | SPI_PUSHR_PCS0_ON | 0xDD);
-	while(!(SPI0_SR & SPI_SR_TCF_MASK));
-	SPI0_PUSHR = (SPI_PUSHR_EOQ_MASK | SPI_PUSHR_PCS0_ON | 0xEE); //send last byte
-	SPI0_SR |= SPI_SR_TFFF_MASK; //clear the status bits (write-1-to-clear)
-	cmd++;
-}
-
-void receiveData(void){
-	unsigned char receiveBuffer[3];
-	SPI0_MCR |=  SPI_MCR_HALT_MASK;
-	SPI0_MCR |= (SPI_MCR_CLR_RXF_MASK | SPI_MCR_CLR_TXF_MASK); //flush the fifos
-	SPI0_SR |= (SPI_SR_TCF_MASK | SPI_SR_EOQF_MASK | SPI_SR_TFUF_MASK | SPI_SR_TFFF_MASK | SPI_SR_RFOF_MASK | SPI_SR_RFDF_MASK); //clear the status bits (write-1-to-clear)
-	SPI0_TCR |= SPI_TCR_SPI_TCNT_MASK;
-	SPI0_MCR &=  ~SPI_MCR_HALT_MASK;
-
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK |  SPI_PUSHR_PCS_MASK | 0x9F); //command byte
-	while (!(SPI0_SR & SPI_SR_RFDF_MASK)  );
-	SPI0_POPR; //dummy read
-	SPI0_SR = SPI_SR_RFDF_MASK;   // clear the reception flag (not self-clearing)
-
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK | SPI_PUSHR_PCS0_ON | 0xFF); //dummy byte to read
-	while (!(SPI0_SR & SPI_SR_RFDF_MASK)  );
-	receiveBuffer[0] = SPI0_POPR; //read
-	SPI0_SR = SPI_SR_RFDF_MASK;   // clear the reception flag (not self-clearing)
-
-	SPI0_PUSHR = (SPI_PUSHR_CONT_MASK |  SPI_PUSHR_PCS0_ON | 0xFF); //dummy byte to read
-	while (!(SPI0_SR & SPI_SR_RFDF_MASK)  );
-	receiveBuffer[1] = SPI0_POPR; //read
-	SPI0_SR = SPI_SR_RFDF_MASK;   // clear the reception flag (not self-clearing)
-
-	SPI0_PUSHR = (SPI_PUSHR_EOQ_MASK | SPI_PUSHR_PCS0_ON | 0xFF); //send last dummy byte to read
-	while (!(SPI0_SR & SPI_SR_RFDF_MASK)  );
-	receiveBuffer[2] = SPI0_POPR; //read
-	SPI0_SR = SPI_SR_RFDF_MASK;   // clear the reception flag (not self-clearing)
-}
-
-void spi_init(){
 	
 }
 
-void initialize(){
-	// configure registers
-	SPI0_MCR = (1<<31); //Enable master mode
+void receiveData(void){
+	
+}
+
+void spi_init(void){
+	/* Configure ports */
+	SIM_SCGC5 = (1<<12); // Enable PORT D clock gating ctrl
+	SIM_SCGC6 = (1<<12); //SPI0 clock
+	PORTD_PCR(0) = PORT_PCR_MUX(2); //Chip select configuration PCS0
+	PORTD_PCR(1) = PORT_PCR_MUX(2); //SCK
+	PORTD_PCR(2) = PORT_PCR_MUX(2); //SOUT
+	PORTD_PCR(3) = PORT_PCR_MUX(2); //SIN
+}
+
+void initialize(void){
+	/* Configure registers */
+	SPI0_MCR |= (1<<31); //Enable master mode
+	SPI0_MCR |= (1<<30);
+	SPI0_MCR |= (0<<29)+(0<<28); //Select SPI mode
+	//SPI0_MCR |= (0xFC<<21); //
+	SPI0_MCR |= (0<<14); ////Enable module clocks (enable SPI) || SPI system enable=1
+	//SPI0_MCR |= (1<<13)+(1<<12); //Disable FIFOS
+	//SPI0_MCR += 0;//Stop tranfer
+	SPI0_MCR |= SPI_MCR_HALT_MASK;//Stop tranfer
+
+	SPI0_CTAR0 = SPI_CTAR_FMSZ(8); //set frame size to 8 bits || 8-bit tranfer
+	//SPI0_CTAR0 = (1<<9);
+	//SPI0_CTAR0 = (1<<14); //CLOCK POLARITY --> The inactive state value of SCK is high.  //SOLO USAR PARA POT
+	//SPI0_CTAR0 = (1<<25); //Data is changed on the leading edge of SCK and captured on the following edge. //SOLO USAR PARA POT
+	//SPI0_CTAR0 = SPI_CTAR_BR(6); //Baud Rate Scaler || Bus rate clock 500khz at 120Mhz
+	SPI0_CTAR0 |= (0x00<<17); //Baud Rate Prescaler
+	
+	//SPI0_PUSHR |= (0<<30)+(0<<29)+(0<<28);
+	//SPI0_PUSHR |= (0xFC<<21); //Chip select assert
+	//Set data rate
 }
 
 int main(void)
 {
-	//configure ports
-	SIM_SCGC5 |= (1<<12); // Enable PORT D clock gating ctrl
-	SIM_SCGC6 |= (1<<12); //SPI0 clock
-	//SIM_SCGC5 |= SIM_SCGC5_PORTD_MASK; // Enable PORT clock gating ctrl
-	//SIM_SCGC6 |= SIM_SCGC6_SPI0_MASK;
+	//SPI0_TCR = 0; //Transfer Count Register
+	//SPI0_PUSHR = 0; //Clear out PUSHR register. Since DSPI is halted, nothing should be transmitted
+	//SPI0_CTAR0 = 0; //Clock and Transfer Attributes Register
 	
-	//PORT D
-	//PORTD_PCR2 = (1<<)+1;
-	PORTD_PCR(0) = PORT_PCR_MUX(2); //PCS0
-	PORTD_PCR(1) = PORT_PCR_MUX(2); //SCK
-	PORTD_PCR(2) = PORT_PCR_MUX(2); //SOUT
-	PORTD_PCR(3) = PORT_PCR_MUX(2); //SIN
+	spi_init();
+	initialize();
+	for(;;) {	
+		
+		sendData();
 
-	// Clear all registers
-	SPI0_SR = (1<<31); //Tranfer Complete Flag
-	SPI0_SR = (1<<28); //End of Queue Flag
-	SPI0_SR = (1<<27); //Transmit FIFO Underflow Flag
-	SPI0_SR = (1<<25); //Transmit FIFO Fill Flag
-	SPI0_SR = (1<<19); //Receive FIFO Overflow Flag 
-	SPI0_SR = (1<<17);//Receive FIFO Drain Flag 
-	//SPI0_SR = (SPI_SR_TCF_MASK | SPI_SR_EOQF_MASK | SPI_SR_TFUF_MASK | SPI_SR_TFFF_MASK | SPI_SR_RFOF_MASK | SPI_SR_RFDF_MASK); //clear the status bits (write-1-to-clear)
-	SPI0_TCR = 0; //Transfer Count Register
-	SPI0_RSER = 0; //DMA-Interrupt Request Select and Enable Register
-	SPI0_PUSHR = 0; //Clear out PUSHR register. Since DSPI is halted, nothing should be transmitted
-	SPI0_CTAR0 = 0; //Clock and Transfer Attributes Register
-
-	
-	SPI0_MCR = SPI_MCR_PCSIS_MASK; //
-	//SPI0_MCR |= SPI_MCR_MSTR_MASK | SPI_MCR_PCSIS_MASK;
-	SPI0_MCR = (0<<13); //Enable TX FIFO
-	SPI0_MCR = (0<<12); //Enable RX FIFO
-	//SPI0_MCR &= (~SPI_MCR_DIS_RXF_MASK & ~SPI_MCR_DIS_TXF_MASK); // enable FIFOs
-	SPI0_MCR = (0<<14)+1; //Enable module clocks (enable SPI) and start transfer
-	//SPI0_MCR &=  (~SPI_MCR_MDIS_MASK & ~SPI_MCR_HALT_MASK); //enable SPI and start transfer
-	SPI0_CTAR0 = SPI_CTAR_FMSZ_8BIT; //set frame size to 8 bits
-	SPI0_CTAR0 = (1<<14); //CLOCK POLARITY --> The inactive state value of SCK is high.
-	SPI0_CTAR0 = (1<<25); //Data is changed on the leading edge of SCK and captured on the following edge.
-	SPI0_CTAR0 = SPI_CTAR_BR(6); //Baud Rate Scaler
-	//SPI0_CTAR0 |=  SPI_CTAR_FMSZ_8BIT | SPI_CTAR_CPOL_MASK | SPI_CTAR_CPHA_MASK | SPI_CTAR_BR(6); // 8 bits, 500khz at 120Mhz
-	
-	for(;;) {	   
 	}
 	
 	return 0;
