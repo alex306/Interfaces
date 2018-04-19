@@ -2,71 +2,37 @@
  * main implementation: use this 'C' sample to create your own application
  *
  */
+
 #include "derivative.h" /* include peripheral declarations */
-
-#define SPI_PUSHR_PCS0_ON 0x10000
-
-
-void sendData(void){
-	SPI0_MCR &= ~SPI_MCR_HALT_MASK;//Stop tranfer
-	SPI0_SR |= (1<<31);
-
-	//SPI0_PUSHR= (SPI_PUSHR_TXDATA(0xAA) | SPI_PUSHR_CONT_MASK |  SPI_PUSHR_PCS(0));
-	SPI0_PUSHR = 0xAA; 
-	while(!(SPI0_SR & SPI_SR_TCF_MASK));
-	
-}
-
-void receiveData(void){
-	
-}
-
-void spi_init(void){
-	/* Configure ports */
-	SIM_SCGC5 = (1<<12); // Enable PORT D clock gating ctrl
-	SIM_SCGC6 = (1<<12); //SPI0 clock
-	PORTD_PCR(0) = PORT_PCR_MUX(2); //Chip select configuration PCS0
-	PORTD_PCR(1) = PORT_PCR_MUX(2); //SCK
-	PORTD_PCR(2) = PORT_PCR_MUX(2); //SOUT
-	PORTD_PCR(3) = PORT_PCR_MUX(2); //SIN
-}
-
-void initialize(void){
-	/* Configure registers */
-	SPI0_MCR |= (1<<31); //Enable master mode
-	SPI0_MCR |= (1<<30);
-	SPI0_MCR |= (0<<29)+(0<<28); //Select SPI mode
-	//SPI0_MCR |= (0xFC<<21); //
-	SPI0_MCR |= (0<<14); ////Enable module clocks (enable SPI) || SPI system enable=1
-	//SPI0_MCR |= (1<<13)+(1<<12); //Disable FIFOS
-	//SPI0_MCR += 0;//Stop tranfer
-	SPI0_MCR |= SPI_MCR_HALT_MASK;//Stop tranfer
-
-	SPI0_CTAR0 = SPI_CTAR_FMSZ(8); //set frame size to 8 bits || 8-bit tranfer
-	//SPI0_CTAR0 = (1<<9);
-	//SPI0_CTAR0 = (1<<14); //CLOCK POLARITY --> The inactive state value of SCK is high.  //SOLO USAR PARA POT
-	//SPI0_CTAR0 = (1<<25); //Data is changed on the leading edge of SCK and captured on the following edge. //SOLO USAR PARA POT
-	//SPI0_CTAR0 = SPI_CTAR_BR(6); //Baud Rate Scaler || Bus rate clock 500khz at 120Mhz
-	SPI0_CTAR0 |= (0x00<<17); //Baud Rate Prescaler
-	
-	//SPI0_PUSHR |= (0<<30)+(0<<29)+(0<<28);
-	//SPI0_PUSHR |= (0xFC<<21); //Chip select assert
-	//Set data rate
+void spiinit();
+void spiinit(){
+	//Clock settings
+	SIM_SCGC5 |= SIM_SCGC6_SPI0_MASK;
+	SIM_SCGC6 |= SIM_SCGC5_PORTD_MASK;
+	//Port Settings
+	PORTD_PCR0 |= PORT_PCR_MUX(2);
+	PORTD_PCR1 |= PORT_PCR_MUX(2);
+	PORTD_PCR2 |= PORT_PCR_MUX(2);
+	PORTD_PCR3 |= PORT_PCR_MUX(2);
+	SPI0_RSER = 0;
+	SPI0_TCR = 0;
+	SPI0_SR = (SPI_SR_TCF_MASK | SPI_SR_TXRXS_MASK | SPI_SR_EOQF_MASK | SPI_SR_TFUF_MASK | SPI_SR_TFFF_MASK | SPI_SR_RFOF_MASK | SPI_SR_RFDF_MASK);
+	SPI0_MCR =0;
+	SPI0_MCR = SPI_MCR_MSTR_MASK | (0 << SPI_MCR_FRZ_SHIFT) | SPI_MCR_PCSIS(1) | SPI_MCR_DCONF(0) | (1 << SPI_MCR_DIS_TXF_SHIFT) | (1 << SPI_MCR_DIS_RXF_SHIFT) | (1 << SPI_MCR_CLR_TXF_SHIFT) | (1 << SPI_MCR_CLR_RXF_SHIFT) | (1 << SPI_MCR_HALT_SHIFT);
+	SPI0_CTAR0 = 0;
+	SPI0_CTAR0 |= (0 << SPI_CTAR_DBR_SHIFT) | SPI_CTAR_FMSZ(8) | (0 << SPI_CTAR_CPOL_SHIFT) | (0 << SPI_CTAR_CPHA_SHIFT) | (0 << SPI_CTAR_LSBFE_SHIFT) | SPI_CTAR_PCSSCK(0) | SPI_CTAR_CSSCK(1) | SPI_CTAR_ASC(0) | SPI_CTAR_PDT(3) | SPI_CTAR_DT(5) | SPI_CTAR_BR(1);
 }
 
 int main(void)
 {
-	//SPI0_TCR = 0; //Transfer Count Register
-	//SPI0_PUSHR = 0; //Clear out PUSHR register. Since DSPI is halted, nothing should be transmitted
-	//SPI0_CTAR0 = 0; //Clock and Transfer Attributes Register
-	
-	spi_init();
-	initialize();
-	for(;;) {	
-		
-		sendData();
-
+	spiinit();
+	for(;;){
+		SPI0_MCR &= ~(SPI_MCR_HALT_MASK | SPI_MCR_FRZ_MASK);
+		SPI0_SR &= ~SPI_SR_EOQF_MASK;
+		SPI0_PUSHR = (SPI_PUSHR_EOQ_MASK | SPI_PUSHR_PCS(0) | 0xAA);
+		while(!(SPI0_SR | SPI_SR_TCF_MASK));
+		SPI0_SR |= SPI_SR_TCF_MASK | SPI_SR_EOQF_MASK;
+		SPI0_MCR |= SPI_MCR_HALT_MASK;
 	}
-	
 	return 0;
 }
